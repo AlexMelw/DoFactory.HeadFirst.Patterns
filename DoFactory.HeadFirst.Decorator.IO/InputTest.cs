@@ -27,66 +27,70 @@ namespace DoFactory.HeadFirst.Decorator.IO
         static void Main()
         {
             // Get fully qualified file names
-            string path = Path.GetDirectoryName(Assembly.GetExecutingAssembly().GetModules()[0].FullyQualifiedName);
+            string fullyQualifiedModuleName = Assembly.GetExecutingAssembly().GetModules()[0].FullyQualifiedName;
+            string path = Path.GetDirectoryName(fullyQualifiedModuleName);
             path = path.Substring(0, path.IndexOf(@"\bin") + 1);
 
-            string inFile = path + "MyInFile.txt";
-            string outFile = path + "MyOutFile.txt";
-            string encFile = path + "MyEncFile.txt";
+            string inFile = $"{path}MyInFile.txt";
+            string outFile = $"{path}MyOutFile.txt";
+            string encFile = $"{path}MyEncFile.txt";
 
-            var fin = new FileStream(inFile, FileMode.Open, FileAccess.Read);
-            var fout = new FileStream(outFile, FileMode.OpenOrCreate, FileAccess.Write);
-
-            // Clear output file
-            fout.SetLength(0);
-
-            //Create variables to help with read and write.
-            int rdlen = 0;
-            long totlen = fin.Length;
-            byte[] bin = new byte[100];
+            int rdLen;
+            long totLen;
             int len;
+            byte[] bin;
 
-            //Read from the input file, then write directly output file.
-            while (rdlen < totlen)
+            using (var fin = new FileStream(inFile, FileMode.Open, FileAccess.Read))
             {
-                len = fin.Read(bin, 0, 100);
-                fout.Write(bin, 0, len);
-                rdlen += len;
+                using (var fout = new FileStream(outFile, FileMode.OpenOrCreate, FileAccess.Write))
+                {
+                    fout.SetLength(value: 0);
+
+                    //Create variables to help with read and write.
+                    rdLen = 0;
+                    totLen = fin.Length;
+                    bin = new byte[fin.Length];
+
+                    //Read from the input file, then write directly output file.
+                    while (rdLen < totLen)
+                    {
+                        len = fin.Read(bin, 0, 100);
+                        fout.Write(bin, 0, len);
+                        rdLen += len;
+                    }
+                }
             }
-            fout.Close();
-            fin.Close();
 
             Console.WriteLine(@"Created unencrypted MyOutFile.txt");
 
             // -- Now use CryptoStream as Decorator --
 
-            fin = new FileStream(inFile, FileMode.Open, FileAccess.Read);
-            fout = new FileStream(encFile, FileMode.OpenOrCreate, FileAccess.Write);
-
-            // Clear output file
-            fout.SetLength(0);
-
-            // Setup Triple DES encryption
-            var des3 = new TripleDESCryptoServiceProvider();
-            byte[] key = HexToBytes("EA81AA1D5FC1EC53E84F30AA746139EEBAFF8A9B76638895");
-            byte[] IV = HexToBytes("87AF7EA221F3FFF5");
-
-            // CryptoStream 'decorates' output stream
-            Console.WriteLine("\nDecorate output stream with CryptoStream...");
-            var fenc = new CryptoStream(
-                fout, des3.CreateEncryptor(key, IV), CryptoStreamMode.Write);
-
-            // Read from the input file, then write encrypted to the output file
-            rdlen = 0;
-            while (rdlen < totlen)
+            using (var fin = new FileStream(inFile, FileMode.Open, FileAccess.Read))
             {
-                len = fin.Read(bin, 0, 100);
-                fenc.Write(bin, 0, len);
-                rdlen += len;
-            }
+                using (var fout = new FileStream(encFile, FileMode.OpenOrCreate, FileAccess.Write))
+                {
+                    fout.SetLength(0);
 
-            fin.Close();
-            fout.Close();
+                    // Setup Triple DES encryption
+                    var des3 = new TripleDESCryptoServiceProvider();
+
+                    byte[] key = HexToBytes("EA81AA1D5FC1EC53E84F30AA746139EEBAFF8A9B76638895");
+                    byte[] IV = HexToBytes("87AF7EA221F3FFF5");
+
+                    // CryptoStream 'decorates' output stream
+                    Console.WriteLine("\nDecorate output stream with CryptoStream...");
+                    var fenc = new CryptoStream(fout, des3.CreateEncryptor(key, IV), CryptoStreamMode.Write);
+
+                    // Read from the input file, then write encrypted to the output file
+                    rdLen = 0;
+                    while (rdLen < totLen)
+                    {
+                        len = fin.Read(bin, 0, 100);
+                        fenc.Write(bin, 0, len);
+                        rdLen += len;
+                    }
+                }
+            }
 
             Console.WriteLine(@"Created encrypted MyEncFile.txt");
 
